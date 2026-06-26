@@ -34,20 +34,24 @@ jobs:
       # ── 3. Compiler / path environment ────────────────────────────────────
       - name: Export compiler variables
         run: |
-          # Pin to gcc-14 to avoid the GCC 16 ICE
           GCC_VER=14
-          echo "GCC_VER=$GCC_VER"
-
           BREW_PREFIX=$(brew --prefix)
-          # Put gcc@14's opt bin first so 'gcc', 'g++', 'gfortran' resolve to 14
-          echo "${BREW_PREFIX}/opt/gcc@14/bin"    >> "$GITHUB_PATH"
+
+          # gcc@14 is keg-only: brew link only creates versioned names
+          # (gcc-14, g++-14, gfortran-14), not the unversioned 'gcc'.
+          # simfactory's setup-silent scans PATH for 'gcc', which otherwise
+          # finds Apple Clang at /usr/bin/gcc.  Create explicit symlinks.
+          ln -sf "${BREW_PREFIX}/opt/gcc@${GCC_VER}/bin/gcc-${GCC_VER}"      "${BREW_PREFIX}/bin/gcc"
+          ln -sf "${BREW_PREFIX}/opt/gcc@${GCC_VER}/bin/g++-${GCC_VER}"      "${BREW_PREFIX}/bin/g++"
+          ln -sf "${BREW_PREFIX}/opt/gcc@${GCC_VER}/bin/gfortran-${GCC_VER}" "${BREW_PREFIX}/bin/gfortran"
+
+          echo "${BREW_PREFIX}/bin"               >> "$GITHUB_PATH"
           echo "CC=gcc-${GCC_VER}"               >> "$GITHUB_ENV"
           echo "CXX=g++-${GCC_VER}"              >> "$GITHUB_ENV"
           echo "FC=gfortran-${GCC_VER}"          >> "$GITHUB_ENV"
           echo "MPICC=mpicc"                      >> "$GITHUB_ENV"
           echo "MPICXX=mpicxx"                    >> "$GITHUB_ENV"
           echo "MPIFC=mpifort"                    >> "$GITHUB_ENV"
-          echo "${BREW_PREFIX}/bin"               >> "$GITHUB_PATH"
           echo "PKG_CONFIG_PATH=${BREW_PREFIX}/lib/pkgconfig:${BREW_PREFIX}/share/pkgconfig" \
                                                   >> "$GITHUB_ENV"
           echo "LDFLAGS=-L${BREW_PREFIX}/lib"    >> "$GITHUB_ENV"
@@ -94,9 +98,11 @@ jobs:
           echo "=== compiler env vars ==="
           echo "CC=$CC  CXX=$CXX  FC=$FC"
           echo "=== simfactory machine config ==="
-          find Cactus/simfactory -name 'github-macos*' | xargs cat 2>/dev/null || echo "(not found)"
+          find Cactus/repos/simfactory2/mdb/machines -name 'github-macos*' 2>/dev/null \
+            | xargs cat 2>/dev/null || echo "(not found)"
           echo "=== OptionList (if already generated) ==="
-          cat Cactus/configs/sim/OptionList 2>/dev/null || echo "(not yet generated)"
+          find Cactus -name 'OptionList' 2>/dev/null | xargs cat 2>/dev/null \
+            || echo "(not yet generated)"
 
       - name: Build ET
         run: |
