@@ -1,0 +1,12 @@
+version: '3'
+
+services:
+
+  ubuntu-valgrind.et-service:
+    build:
+        context: .
+        dockerfile: ubuntu-valgrind.et.docker
+    image: stevenrbrandt/ubuntu-valgrind.et
+    hostname: ubuntu-valgrind.et-host
+    container_name: ubuntu-valgrind.et
+    entrypoint: sleep infinity

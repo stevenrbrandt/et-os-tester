@@ -1,0 +1,11 @@
+FROM stevenrbrandt/ubuntu.et
+# Note: ubuntu.et must be built before this image.
+USER root
+RUN apt-get update && apt-get install -y valgrind
+COPY summarize-valgrind.py /home/etuser/summarize-valgrind.py
+RUN chown etuser /home/etuser/summarize-valgrind.py
+USER etuser
+WORKDIR /home/etuser/Cactus
+ENV SYSTEM=ubuntu-valgrind
+COPY runtests-valgrind.sh .
+RUN ./runtests-valgrind.sh

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import curses
 import hashlib
+import json
 import os
 import re
 import subprocess
@@ -8,9 +9,17 @@ import threading
 import time
 
 DISTROS = ['mint', 'opensuse', 'ubuntu', 'fedora', 'debian', 'rocky', 'alma', 'arch']
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-CACTUS_TH = os.path.join(SCRIPT_DIR, 'cactus.th')
-CACTUS_URL = 'https://bitbucket.org/einsteintoolkit/manifest/raw/master/einsteintoolkit.th'
+
+# Special tests appear below a separator in the menu.  They build on top of
+# existing distro images and have extended status (e.g. memory-error counts).
+SPECIAL_TESTS = ['ubuntu-valgrind']
+
+ALL_ENTRIES = DISTROS + SPECIAL_TESTS
+
+SCRIPT_DIR          = os.path.dirname(os.path.abspath(__file__))
+CACTUS_TH           = os.path.join(SCRIPT_DIR, 'cactus.th')
+CACTUS_URL          = 'https://bitbucket.org/einsteintoolkit/manifest/raw/master/einsteintoolkit.th'
+VALGRIND_STATE_FILE = os.path.join(SCRIPT_DIR, '.valgrind_results.json')
 
 COLOR_DEFAULT = 0
 COLOR_RED     = 1
@@ -62,13 +71,30 @@ def probe(os_name, current_md5):
 
 
 def probe_all(current_md5):
-    for name in DISTROS:
+    for name in ALL_ENTRIES:
         probe(name, current_md5)
 
 
 def all_checked():
     with _cache_lock:
-        return all(_cache.get(n, (None, 'checking'))[1] != 'checking' for n in DISTROS)
+        return all(_cache.get(n, (None, 'checking'))[1] != 'checking' for n in ALL_ENTRIES)
+
+
+# ── Valgrind results state ───────────────────────────────────────────────────
+
+def _load_valgrind_results():
+    try:
+        with open(VALGRIND_STATE_FILE) as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
+
+
+def _save_valgrind_result(test_name, error_count):
+    results = _load_valgrind_results()
+    results[test_name] = error_count
+    with open(VALGRIND_STATE_FILE, 'w') as f:
+        json.dump(results, f, indent=2)
 
 
 # ── Live run status ──────────────────────────────────────────────────────────
@@ -106,27 +132,25 @@ def get_run():
 
 # ── Phase detection from build output ────────────────────────────────────────
 
-# Matches both BuildKit ("#N [M/K] RUN ...") and legacy ("Step N/M : RUN ...") headers
 _DOCKER_STEP_RE = re.compile(r'(?:#\d+ \[\d+/\d+\]|Step \d+/\d+ :)\s+RUN (.*)')
 
 _STEP_PHASES = [
-    (re.compile(r'et-pkg-installer'),   'installing packages'),
-    (re.compile(r'zypper|apt-get|yum'), 'installing system packages'),
-    (re.compile(r'GetComponents'),      'fetching sources'),
-    (re.compile(r'sim setup-silent'),   'configuring simfactory'),
-    (re.compile(r'sim build'),          'compiling'),
-    (re.compile(r'runtests\.sh'),       'running tests'),
-    (re.compile(r'useradd'),            'creating user'),
+    (re.compile(r'et-pkg-installer'),        'installing packages'),
+    (re.compile(r'zypper|apt-get|yum|dnf'),  'installing system packages'),
+    (re.compile(r'GetComponents'),           'fetching sources'),
+    (re.compile(r'sim setup-silent'),        'configuring simfactory'),
+    (re.compile(r'sim build'),               'compiling'),
+    (re.compile(r'runtests-valgrind\.sh'),   'running valgrind tests'),
+    (re.compile(r'runtests\.sh'),            'running tests'),
+    (re.compile(r'useradd'),                 'creating user'),
 ]
 
-# set -x output from runtests.sh: "+ ./simfactory/bin/sim create-run testN ..."
-_SIM_RUN_RE  = re.compile(r'\+.*sim create-run test(\d+)')
-# Thorn names during compilation
-_THORN_RE    = re.compile(r'(?:Building thorn|Compiling)\s+(\S+)')
+_SIM_RUN_RE     = re.compile(r'\+.*sim create-run (?:test|valgrind)(\d+)')
+_THORN_RE       = re.compile(r'(?:Building thorn|Compiling)\s+(\S+)')
+_VALGRIND_ERR_RE = re.compile(r'^==\d+== ERROR SUMMARY: (\d+) errors', re.MULTILINE)
 
 
 def _parse_line(line):
-    """Update run phase/detail from a single output line; does not append the line."""
     m = _DOCKER_STEP_RE.search(line)
     if m:
         cmd = m.group(1)
@@ -140,15 +164,20 @@ def _parse_line(line):
         _set_run(detail=f'procs={m.group(1)}')
         return
 
+    m = _VALGRIND_ERR_RE.search(line)
+    if m:
+        n = int(m.group(1))
+        _set_run(detail=f'{n} error(s) so far' if n else 'clean so far')
+        return
+
     m = _THORN_RE.search(line)
     if m:
         _set_run(detail=m.group(1))
 
 
-# ── Running a distro ─────────────────────────────────────────────────────────
+# ── Running a distro / special test ─────────────────────────────────────────
 
 def _step(cmd, log_fh=None):
-    """Run a command, feed output to the status panel and optionally a log file."""
     proc = subprocess.Popen(
         cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, cwd=SCRIPT_DIR
     )
@@ -170,10 +199,10 @@ def _telegram(msg):
 
 
 def run_distro_live(os_name):
-    """Full build/test cycle for one distro. Runs in a background thread."""
-    yaml      = f'{os_name}.et.yaml'
-    log_path  = os.path.join(SCRIPT_DIR, f'build.{os_name}.log')
-    results   = os.path.join(SCRIPT_DIR, 'testsuite_results', 'results')
+    """Full build/test cycle for one distro or special test."""
+    yaml     = f'{os_name}.et.yaml'
+    log_path = os.path.join(SCRIPT_DIR, f'build.{os_name}.log')
+    results  = os.path.join(SCRIPT_DIR, 'testsuite_results', 'results')
 
     _set_run(active=True, distro=os_name, phase='starting build',
              detail='', lines=[], success=None)
@@ -206,12 +235,33 @@ def run_distro_live(os_name):
             success = False
     _telegram(f'copied {os_name}')
 
+    # Extra step for valgrind tests: copy summary and record error count
+    if os_name in SPECIAL_TESTS:
+        summary_name = f'{os_name}__valgrind_summary.txt'
+        _set_run(phase='copying valgrind summary', detail='')
+        src = f'{os_name}.et:/home/etuser/{summary_name}'
+        dst = os.path.join(results, summary_name)
+        if _step(['docker', 'cp', src, dst]) == 0:
+            _parse_valgrind_summary(os_name, dst)
+
     _set_run(phase='stopping container', detail='')
     _step(['docker-compose', '-f', yaml, 'down'])
 
     label = 'done' if success else 'done (errors copying logs)'
     _set_run(active=False, phase=label, success=success)
     return success
+
+
+def _parse_valgrind_summary(test_name, summary_path):
+    """Extract total error count from summary file and persist it."""
+    try:
+        with open(summary_path) as f:
+            content = f.read()
+        m = re.search(r'Total valgrind errors found: (\d+)', content)
+        if m:
+            _save_valgrind_result(test_name, int(m.group(1)))
+    except Exception:
+        pass
 
 
 def _launch_distro(os_name, on_done=None):
@@ -223,6 +273,7 @@ def _launch_distro(os_name, on_done=None):
 
 
 def _launch_all(on_done=None):
+    """Run all regular distros (not special tests)."""
     def _run():
         for name in DISTROS:
             ok = run_distro_live(name)
@@ -258,6 +309,7 @@ def update_cactus_th():
 # ── Curses drawing ───────────────────────────────────────────────────────────
 
 def distro_status(os_name, current_md5):
+    """Return (label, color_pair) for a distro or special test."""
     if current_md5 is None:
         return 'no cactus.th', COLOR_RED
     with _cache_lock:
@@ -265,22 +317,38 @@ def distro_status(os_name, current_md5):
     if entry is None or entry[1] == 'checking':
         return 'checking...', COLOR_DEFAULT
     _, state = entry
-    colors = {
-        'current':  COLOR_GREEN,
-        'outdated': COLOR_YELLOW,
-        'no image': COLOR_RED,
-        'error':    COLOR_RED,
-    }
-    return state, colors.get(state, COLOR_DEFAULT)
+
+    base_color = {'current': COLOR_GREEN, 'outdated': COLOR_YELLOW}.get(state, COLOR_RED)
+
+    if os_name in SPECIAL_TESTS and state in ('current', 'outdated'):
+        vr = _load_valgrind_results()
+        if os_name in vr:
+            count = vr[os_name]
+            suffix = 'clean' if count == 0 else f'{count} errors'
+            color  = COLOR_GREEN if count == 0 else COLOR_RED
+            return f'{state} | {suffix}', color
+
+    return state, base_color
 
 
 def _addstr_clipped(stdscr, row, col, text, attr=curses.A_NORMAL):
-    """addstr that silently clips to terminal width."""
     h, w = stdscr.getmaxyx()
     if row >= h - 1 or col >= w:
         return
-    available = w - col
-    stdscr.addstr(row, col, text[:available], attr)
+    stdscr.addstr(row, col, text[:w - col], attr)
+
+
+# Column layout: cursor(2) + name(18) = col 20 for status bracket
+_NAME_COL  = 18
+_STATUS_COL = 2 + _NAME_COL
+
+
+def _draw_entry(stdscr, row, idx, selected, name, current_md5):
+    label, color = distro_status(name, current_md5)
+    cursor = '> ' if idx == selected else '  '
+    attr   = curses.A_REVERSE if idx == selected else curses.A_NORMAL
+    _addstr_clipped(stdscr, row, 2, f'{cursor}{name:<{_NAME_COL}}', attr)
+    _addstr_clipped(stdscr, row, _STATUS_COL, f'[{label}]', curses.color_pair(color))
 
 
 def draw_menu(stdscr, selected, current_md5):
@@ -288,50 +356,54 @@ def draw_menu(stdscr, selected, current_md5):
     h, w = stdscr.getmaxyx()
     run = get_run()
 
-    row = 0
+    # Title
     title = ' Einstein Toolkit Linux Tester '
-    _addstr_clipped(stdscr, row, max(0, (w - len(title)) // 2), title,
+    _addstr_clipped(stdscr, 0, max(0, (w - len(title)) // 2), title,
                     curses.A_BOLD | curses.A_REVERSE)
 
-    row = 2
+    # cactus.th md5
     md5_short = (current_md5[:16] + '...') if current_md5 else 'missing'
-    _addstr_clipped(stdscr, row, 2, f'cactus.th: {md5_short}')
+    _addstr_clipped(stdscr, 2, 2, f'cactus.th: {md5_short}')
 
-    row = 4
-    _addstr_clipped(stdscr, row, 2, f"  {'Distro':<14} Status", curses.A_UNDERLINE)
+    # Column header
+    _addstr_clipped(stdscr, 4, 2,
+                    f"  {'Distro':<{_NAME_COL}} Status", curses.A_UNDERLINE)
 
+    # Regular distros
     for i, name in enumerate(DISTROS):
-        label, color = distro_status(name, current_md5)
-        r = 5 + i
-        cursor = '> ' if i == selected else '  '
-        attr = curses.A_REVERSE if i == selected else curses.A_NORMAL
-        _addstr_clipped(stdscr, r, 2, f'{cursor}{name:<14}', attr)
-        _addstr_clipped(stdscr, r, 18, f'[{label}]', curses.color_pair(color))
+        _draw_entry(stdscr, 5 + i, i, selected, name, current_md5)
 
-    # ── Status panel ──────────────────────────────────────────────────────
-    sep_row = 5 + len(DISTROS) + 1          # one blank line after distro list
-    panel_top = sep_row + 1
+    # Separator + special tests
+    if SPECIAL_TESTS:
+        sep_row = 5 + len(DISTROS) + 1
+        sep = '─' * max(0, w - 4)
+        label = ' special tests '
+        mid = max(0, (w - len(label)) // 2)
+        _addstr_clipped(stdscr, sep_row, 2, sep, curses.A_DIM)
+        _addstr_clipped(stdscr, sep_row, mid, label, curses.A_DIM)
 
+        for j, name in enumerate(SPECIAL_TESTS):
+            idx = len(DISTROS) + j
+            _draw_entry(stdscr, sep_row + 1 + j, idx, selected, name, current_md5)
+
+    # Status panel (shown whenever a phase is set)
+    first_panel_row = 5 + len(DISTROS) + (3 + len(SPECIAL_TESTS) if SPECIAL_TESTS else 2)
     if run['phase']:
-        sep = '─' * (w - 2)
-        _addstr_clipped(stdscr, sep_row, 1, sep, curses.color_pair(COLOR_CYAN))
+        sep = '─' * max(0, w - 2)
+        _addstr_clipped(stdscr, first_panel_row, 1, sep, curses.color_pair(COLOR_CYAN))
 
-        # Phase line
         distro_label = f'[{run["distro"]}]  ' if run['distro'] else ''
-        phase_str    = run['phase']
         detail_str   = f'  {run["detail"]}' if run['detail'] else ''
-        _addstr_clipped(stdscr, panel_top, 2,
-                        f'{distro_label}{phase_str}{detail_str}',
+        _addstr_clipped(stdscr, first_panel_row + 1, 2,
+                        f'{distro_label}{run["phase"]}{detail_str}',
                         curses.A_BOLD | curses.color_pair(COLOR_CYAN))
 
-        # Log lines — fill remaining space above footer
-        log_top  = panel_top + 1
+        log_top  = first_panel_row + 2
         log_rows = max(0, h - 2 - log_top)
-        lines    = run['lines'][-log_rows:] if log_rows else []
-        for j, line in enumerate(lines):
+        for j, line in enumerate(run['lines'][-log_rows:]):
             _addstr_clipped(stdscr, log_top + j, 2, line)
 
-    # ── Footer ────────────────────────────────────────────────────────────
+    # Footer
     if run['active']:
         keys = ' (test running — K:kill  Q:quit) '
     else:
@@ -359,15 +431,13 @@ def main_loop(stdscr):
     stdscr.timeout(500)
 
     def on_done(os_name, ok):
-        current_md5 = md5_file(CACTUS_TH)
-        probe(os_name, current_md5)
+        probe(os_name, md5_file(CACTUS_TH))
+
+    n_entries = len(ALL_ENTRIES)
 
     while True:
         run = get_run()
-        if all_checked() and not run['active']:
-            stdscr.timeout(-1)
-        else:
-            stdscr.timeout(500)
+        stdscr.timeout(-1 if (all_checked() and not run['active']) else 500)
 
         current_md5 = md5_file(CACTUS_TH)
         draw_menu(stdscr, selected, current_md5)
@@ -375,13 +445,13 @@ def main_loop(stdscr):
         key = stdscr.getch()
 
         if key == curses.KEY_UP:
-            selected = (selected - 1) % len(DISTROS)
+            selected = (selected - 1) % n_entries
         elif key == curses.KEY_DOWN:
-            selected = (selected + 1) % len(DISTROS)
+            selected = (selected + 1) % n_entries
 
         elif key in (curses.KEY_ENTER, ord('\n'), ord('\r')):
             if not run['active']:
-                _launch_distro(DISTROS[selected], on_done=on_done)
+                _launch_distro(ALL_ENTRIES[selected], on_done=on_done)
                 stdscr.timeout(500)
 
         elif key in (ord('a'), ord('A')):
@@ -412,7 +482,6 @@ def main_loop(stdscr):
             stdscr.timeout(500)
 
         elif key in (ord('k'), ord('K')):
-            # Best-effort kill: stop any running docker-compose containers
             if run['active'] and run['distro']:
                 yaml = f'{run["distro"]}.et.yaml'
                 subprocess.Popen(

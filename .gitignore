@@ -17,6 +17,7 @@ Cactus/
 
 # Runtime state
 .linuxes_state.json
+.valgrind_results.json
 
 # Misc
 __pycache__/
