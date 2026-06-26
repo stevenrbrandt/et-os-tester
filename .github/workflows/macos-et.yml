@@ -86,6 +86,17 @@ jobs:
           ./simfactory/bin/sim setup-silent
 
       # ── 8. Build ───────────────────────────────────────────────────────────
+      - name: Show simfactory compiler configuration
+        run: |
+          echo "=== gcc in PATH ==="
+          which gcc && gcc --version
+          echo "=== compiler env vars ==="
+          echo "CC=$CC  CXX=$CXX  FC=$FC"
+          echo "=== simfactory machine config ==="
+          find Cactus/simfactory -name 'github-macos*' | xargs cat 2>/dev/null || echo "(not found)"
+          echo "=== OptionList (if already generated) ==="
+          cat Cactus/configs/sim/OptionList 2>/dev/null || echo "(not yet generated)"
+
       - name: Build ET
         run: |
           set -o pipefail
