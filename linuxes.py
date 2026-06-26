@@ -245,7 +245,9 @@ def run_distro_live(os_name):
     time.sleep(5)
 
     success = True
-    for suffix in ['1_4', '2_4']:
+    # valgrind runs with procs=2 threads=2 → suffix 2_2; normal runs → 1_4 and 2_4
+    log_suffixes = ['2_2'] if os_name in SPECIAL_TESTS else ['1_4', '2_4']
+    for suffix in log_suffixes:
         log_name = f'{os_name}__{suffix}.log'
         _set_run(phase='copying logs', detail=log_name)
         src = f'{os_name}.et:/home/etuser/{log_name}'
