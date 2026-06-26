@@ -85,17 +85,41 @@ jobs:
           ./simfactory/bin/sim build -j3 --thornlist ../cactus.th 2>&1 | tee build.log
 
       # ── 9. Tests ───────────────────────────────────────────────────────────
+      # sim create-run writes its own stdout to the .log file; the actual
+      # test output (pass/fail per thorn) goes into Cactus/SIMULATIONS/.
+      # We run both proc counts, collect everything, and show a summary.
       - name: Run test suite
         run: |
           cd Cactus
           for procs in 1 2; do
             threads=4
             nprocs=$((procs*threads))
+            echo "=== Running testsuite with procs=$nprocs threads=$threads ==="
             ./simfactory/bin/sim create-run test${nprocs} \
               --walltime 1:00:00 --testsuite \
               --procs $nprocs --num-threads $threads --ppn-used=$nprocs \
-              > "$HOME/${SYSTEM}__${procs}_${threads}.log" 2>&1 || true
+              > "$HOME/${SYSTEM}__${procs}_${threads}.log" 2>&1
+            echo "Exit code: $?"
           done
+
+      - name: Show test summary
+        if: always()
+        run: |
+          echo "=== Simfactory log snippets ==="
+          for f in ~/macos__*.log; do
+            echo "--- $f ---"
+            cat "$f"
+          done
+          echo ""
+          echo "=== Test results (pass/fail lines) ==="
+          find Cactus/SIMULATIONS -name '*.log' -o -name 'TEST' -type d 2>/dev/null \
+            | head -20 || echo "(no SIMULATIONS output found)"
+          find Cactus/SIMULATIONS -name '*.log' 2>/dev/null \
+            | xargs grep -l "FAILED\|passed\|failed" 2>/dev/null \
+            | while read f; do
+                echo "--- $f ---"
+                grep -E "FAILED|passed|failed|ERROR" "$f" | tail -20
+              done
 
       # ── 10. Artifacts ──────────────────────────────────────────────────────
       - name: Upload logs
@@ -106,3 +130,4 @@ jobs:
           path: |
             ~/macos__*.log
             Cactus/build.log
+            Cactus/SIMULATIONS/
