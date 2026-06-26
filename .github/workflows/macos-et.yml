@@ -14,7 +14,7 @@ jobs:
 
     steps:
       # ── 1. Repo ────────────────────────────────────────────────────────────
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       # ── 2. Homebrew packages ───────────────────────────────────────────────
       - name: Install Homebrew packages
@@ -61,7 +61,7 @@ jobs:
       # ── 6. Source cache — keyed on thornlist content ───────────────────────
       - name: Cache ET source tree
         id: cache-cactus
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: Cactus
           key: cactus-src-macos14-${{ hashFiles('cactus.th') }}
@@ -124,7 +124,7 @@ jobs:
       # ── 10. Artifacts ──────────────────────────────────────────────────────
       - name: Upload logs
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: macos-logs-${{ github.run_number }}
           path: |
