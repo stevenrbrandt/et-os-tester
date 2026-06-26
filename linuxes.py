@@ -194,8 +194,11 @@ def _parse_line(line):
 # ── Running a distro / special test ─────────────────────────────────────────
 
 def _step(cmd, log_fh=None):
+    env = os.environ.copy()
+    env['BUILDKIT_STEP_LOG_MAX_SIZE'] = '-1'
     proc = subprocess.Popen(
-        cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, cwd=SCRIPT_DIR
+        cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+        cwd=SCRIPT_DIR, env=env
     )
     for raw in proc.stdout:
         text = raw.decode('utf-8', errors='replace')

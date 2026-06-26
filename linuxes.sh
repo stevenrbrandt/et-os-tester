@@ -1,4 +1,5 @@
 set -e
+export BUILDKIT_STEP_LOG_MAX_SIZE=-1
 curl -o cactus_new.th -kL https://bitbucket.org/einsteintoolkit/manifest/raw/master/einsteintoolkit.th
 M5_NEW=$(md5sum cactus_new.th)
 M5=$(md5sum cactus.th)
