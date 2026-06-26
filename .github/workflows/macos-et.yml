@@ -82,6 +82,7 @@ jobs:
       # ── 8. Build ───────────────────────────────────────────────────────────
       - name: Build ET
         run: |
+          set -o pipefail
           cd Cactus
           ./simfactory/bin/sim build -j3 --thornlist ../cactus.th 2>&1 | tee build.log
 
@@ -91,6 +92,7 @@ jobs:
       # We run both proc counts, collect everything, and show a summary.
       - name: Run test suite
         run: |
+          set -o pipefail
           cd Cactus
           for procs in 1 2; do
             threads=4
@@ -100,7 +102,6 @@ jobs:
               --walltime 1:00:00 --testsuite \
               --procs $nprocs --num-threads $threads --ppn-used=$nprocs 2>&1 \
               | tee "$HOME/${SYSTEM}__${procs}_${threads}.log"
-            echo "Exit code: $?"
           done
 
       - name: Show test summary
