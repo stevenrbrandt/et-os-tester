@@ -6,7 +6,7 @@ import sys
 
 def get_pkg_cmd():
     for p in os.environ["PATH"].split(os.pathsep):
-        for cmd in ["apt-get","dnf","yum","zypper"]:
+        for cmd in ["apt-get","dnf","yum","zypper","pacman"]:
             f = p+os.sep+cmd
             if os.path.exists(f):
                 return cmd
@@ -144,6 +144,39 @@ susek = {
     "libudev":None,
     }
 
+archk = {
+    "perl":       "perl",
+    "awk":        "gawk",
+    "cmake":      "cmake",
+    "gfortran":   "gcc-fortran",
+    "gcc":        "gcc",
+    "g++":        "gcc",          # g++ is part of the gcc package on Arch
+    "papi":       None,            # not in official Arch repos
+    "gsl":        "gsl",
+    "lapack":     "lapack",
+    "hdf5":       "hdf5",
+    "mpi":        ["openmpi"],
+    "pkg-config": "pkgconf",
+    "subversion": "subversion",
+    "git":        "git",
+    "python":     "python",
+    "patch":      "patch",
+    "make":       "make",
+    "numa":       "numactl",
+    "hwloc":      "hwloc",
+    "ssl":        "openssl",
+    "fftw":       "fftw",
+    "curl":       "curl",
+    "which":      "which",
+    "rsync":      "rsync",
+    "tar":        "tar",
+    "hostname":   "inetutils",
+    "xargs":      "findutils",
+    "jpeg":       "libjpeg-turbo",
+    "libtool":    "libtool",
+    "libudev":    "systemd",
+    }
+
 cmds = {
     "perl":"perl",
     "awk":"awk",
@@ -186,6 +219,7 @@ def check(h1,h2):
 
 check(debk,redk)
 check(redk,susek)
+check(redk,archk)
 check(redk,cmds)
 
 install_cache = {}
@@ -229,6 +263,12 @@ def installed1(kcmd,cmd):
                 install_cache[one_pkg]=1
         if cmd in install_cache:
             return {"installed":1,"missing":[]}
+    if pkg_cmd == "pacman":
+        if install_cache == {}:
+            for line in os.popen("pacman -Q"):
+                install_cache[line.split()[0]] = 1
+        if cmd in install_cache:
+            return {"installed":1,"missing":[]}
     return {"installed":0,"missing":[cmd]}
 
 def installed(kcmd,cmd):
@@ -251,6 +291,11 @@ def installed(kcmd,cmd):
         return answer
     return {"installed":0,"missing":[]}
 
+def install_cmd():
+    if pkg_cmd == "pacman":
+        return "pacman -S --noconfirm"
+    return pkg_cmd + " install -y"
+
 pkgs = None
 if pkg_cmd == "apt-get":
     pkgs = debk
@@ -258,6 +303,8 @@ elif pkg_cmd == "dnf" or pkg_cmd == "yum":
     pkgs = redk
 elif pkg_cmd == "zypper":
     pkgs = susek
+elif pkg_cmd == "pacman":
+    pkgs = archk
 else:
     raise Exception("No package manager")
 
@@ -287,9 +334,7 @@ def install():
             "/etc/redhat-release",
         ]
         if any(os.path.exists(f) for f in rhel_release_files):
-            epel = installed("epel-release", None)
-            if len(epel["missing"]) > 0:
-                fd.write(pkg_cmd+" install -y epel-release\n")
+            fd.write(install_cmd()+" epel-release\n")
 
     first = True
     for c in answer["missing"]:
@@ -297,8 +342,7 @@ def install():
             if type(c) == str:
                 if first:
                     first = False
-                    fd.write(pkg_cmd)
-                    fd.write(" install -y")
+                    fd.write(install_cmd())
                 fd.write(' ')
                 fd.write(c)
             elif type(c) == list:

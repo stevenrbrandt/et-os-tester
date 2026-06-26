@@ -1,0 +1,12 @@
+version: '3'
+
+services:
+
+  arch.et-service:
+    build:
+        context: .
+        dockerfile: arch.et.docker
+    image: stevenrbrandt/arch.et
+    hostname: arch.et-host
+    container_name: arch.et
+    entrypoint: sleep infinity

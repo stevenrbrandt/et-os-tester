@@ -7,7 +7,7 @@ import subprocess
 import threading
 import time
 
-DISTROS = ['mint', 'opensuse', 'ubuntu', 'fedora', 'debian', 'rocky']
+DISTROS = ['mint', 'opensuse', 'ubuntu', 'fedora', 'debian', 'rocky', 'alma', 'arch']
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 CACTUS_TH = os.path.join(SCRIPT_DIR, 'cactus.th')
 CACTUS_URL = 'https://bitbucket.org/einsteintoolkit/manifest/raw/master/einsteintoolkit.th'

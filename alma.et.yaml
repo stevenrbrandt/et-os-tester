@@ -1,0 +1,12 @@
+version: '3'
+
+services:
+
+  alma.et-service:
+    build:
+        context: .
+        dockerfile: alma.et.docker
+    image: stevenrbrandt/alma.et
+    hostname: alma.et-host
+    container_name: alma.et
+    entrypoint: sleep infinity

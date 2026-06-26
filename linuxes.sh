@@ -6,7 +6,7 @@ if [ "$M5" != "$M5_NEW" ]
 then
     cp cactus_new.th cactus.th
 fi
-for os in mint opensuse ubuntu fedora debian rocky
+for os in mint opensuse ubuntu fedora debian rocky alma arch
 do
   echo "=============================================="
   echo "TESTING $os"
