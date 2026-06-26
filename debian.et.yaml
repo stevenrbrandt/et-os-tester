@@ -1,0 +1,22 @@
+version: '3'
+
+#volumes:
+#    home_debian.et:
+
+services:
+
+  debian.et-service:
+    build:
+        context: .
+        dockerfile: debian.et.docker
+    image: stevenrbrandt/debian.et
+    hostname: debian.et-host
+    container_name: debian.et
+    #ports:
+    #  - 8888:8888
+    volumes:
+      - ./testsuite_results/:/testsuite_results/
+    entrypoint: sleep infinity
+    environment:
+        - SYSTEM=debian
+    #entrypoint: ./runtests.sh

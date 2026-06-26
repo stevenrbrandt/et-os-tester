@@ -1,0 +1,23 @@
+# Downloaded/generated thornlists
+cactus.th
+cactus_new.th
+einsteintoolkit.th
+
+# Build and test output
+build.*.log
+*.log
+testsuite_results/
+make.out
+build.out
+presync-build.out
+out-*.txt
+
+# ET source tree checked out by GetComponents
+Cactus/
+
+# Runtime state
+.linuxes_state.json
+
+# Misc
+__pycache__/
+*.pyc

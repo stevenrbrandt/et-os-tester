@@ -1,0 +1,20 @@
+version: '3'
+
+#volumes:
+#    home_rocky.et:
+
+services:
+
+  rocky.et-service:
+    build:
+        context: .
+        dockerfile: rocky.et.docker
+    image: stevenrbrandt/rocky.et
+    hostname: rocky.et-host
+    container_name: rocky.et
+    #ports:
+    #  - 8888:8888
+    #volumes:
+    #  - home_rocky.et:/home
+    entrypoint: sleep infinity
+    privileged: true

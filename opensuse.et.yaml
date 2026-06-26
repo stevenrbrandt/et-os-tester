@@ -1,0 +1,19 @@
+version: '3'
+
+#volumes:
+#    home_opensuse.et:
+
+services:
+
+  opensuse.et-service:
+    build:
+        context: .
+        dockerfile: opensuse.et.docker
+    image: stevenrbrandt/opensuse.et
+    hostname: opensuse.et-host
+    container_name: opensuse.et
+    #ports:
+    #  - 8888:8888
+    #volumes:
+    #  - home_opensuse.et:/home
+    entrypoint: sleep infinity

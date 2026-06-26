@@ -1,0 +1,19 @@
+version: '3'
+
+#volumes:
+#    home_mint.et:
+
+services:
+
+  mint.et-service:
+    build:
+        context: .
+        dockerfile: mint.et.docker
+    image: stevenrbrandt/mint.et
+    hostname: mint.et-host
+    container_name: mint.et
+    #ports:
+    #  - 8888:8888
+    #volumes:
+    #  - home_mint.et:/home
+    entrypoint: sleep infinity

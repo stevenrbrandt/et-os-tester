@@ -1,0 +1,20 @@
+version: '3'
+
+#volumes:
+#    home_fedora.et:
+
+services:
+
+  fedora.et-service:
+    build:
+        context: .
+        dockerfile: fedora.et.docker
+    image: stevenrbrandt/fedora.et
+    hostname: fedora.et-host
+    container_name: fedora.et
+    #ports:
+    #  - 8888:8888
+    #volumes:
+    #  - home_fedora.et:/home
+    entrypoint: sleep infinity
+    privileged: true

@@ -1,0 +1,19 @@
+version: '3'
+
+#volumes:
+#    home_ubuntu.et:
+
+services:
+
+  ubuntu.et-service:
+    build:
+        context: .
+        dockerfile: ubuntu.et.docker
+    image: stevenrbrandt/ubuntu.et
+    hostname: ubuntu.et-host
+    container_name: ubuntu.et
+    #ports:
+    #  - 8888:8888
+    #volumes:
+    #  - home_ubuntu.et:/home
+    entrypoint: sleep infinity
