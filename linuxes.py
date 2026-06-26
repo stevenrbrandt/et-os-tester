@@ -151,7 +151,7 @@ _THORN_RE        = re.compile(r'(?:Building thorn|Compiling)\s+(\S+)')
 _VALGRIND_ERR_RE = re.compile(r'^==\d+== ERROR SUMMARY: (\d+) errors', re.MULTILINE)
 # Simfactory testsuite output lines (visible now that runtests.sh uses tee)
 _TEST_RUN_RE     = re.compile(r'Running\s+TEST\s*:?\s*(\S+)', re.IGNORECASE)
-_TEST_DONE_RE    = re.compile(r'\b(PASSED|FAILED|ERROR)\b')
+_TEST_DONE_RE    = re.compile(r'\b(PASSED|FAILED)\b')
 
 
 def _parse_line(line):
