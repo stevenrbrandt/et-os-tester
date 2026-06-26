@@ -27,6 +27,9 @@ jobs:
           # hdf5 is serial here — parallel HDF5 can be added later via hdf5-mpi
           brew install gcc@14 open-mpi hdf5 gsl fftw \
                        subversion pkg-config hwloc libtool cmake openssl
+          # Make unversioned gcc/g++/gfortran names resolve to gcc@14 so
+          # simfactory's compiler auto-detection doesn't pick up a newer GCC.
+          brew link --force --overwrite gcc@14
 
       # ── 3. Compiler / path environment ────────────────────────────────────
       - name: Export compiler variables
@@ -36,6 +39,8 @@ jobs:
           echo "GCC_VER=$GCC_VER"
 
           BREW_PREFIX=$(brew --prefix)
+          # Put gcc@14's opt bin first so 'gcc', 'g++', 'gfortran' resolve to 14
+          echo "${BREW_PREFIX}/opt/gcc@14/bin"    >> "$GITHUB_PATH"
           echo "CC=gcc-${GCC_VER}"               >> "$GITHUB_ENV"
           echo "CXX=g++-${GCC_VER}"              >> "$GITHUB_ENV"
           echo "FC=gfortran-${GCC_VER}"          >> "$GITHUB_ENV"
