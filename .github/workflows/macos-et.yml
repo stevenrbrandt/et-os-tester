@@ -91,6 +91,13 @@ jobs:
              Cactus/repos/simfactory2/mdb/machines/MacOS.ini
           cp "$GITHUB_WORKSPACE/simfactory/MacOS.cfg" \
              Cactus/repos/simfactory2/mdb/optionlists/MacOS.cfg
+          # Put Cactus's own Perl preprocessor (cpp.pl) on PATH.
+          # It handles ## token-pasting and empty invocations gracefully,
+          # unlike Apple's clang cpp (broken ## in -traditional mode) or
+          # gcc -E (loud "no input files" on thorns with no preprocessable sources).
+          FLESH_SBIN="$(pwd)/Cactus/repos/flesh/lib/sbin"
+          echo "${FLESH_SBIN}" >> "$GITHUB_PATH"   # for subsequent steps
+          export PATH="${FLESH_SBIN}:${PATH}"       # for sim setup-silent below
           cd Cactus
           ./simfactory/bin/sim setup-silent
 
