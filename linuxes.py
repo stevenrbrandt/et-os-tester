@@ -222,22 +222,27 @@ def run_distro_live(os_name):
     yaml     = f'{os_name}.et.yaml'
     log_path = os.path.join(SCRIPT_DIR, f'build.{os_name}.log')
     results  = os.path.join(SCRIPT_DIR, 'testsuite_results', 'results')
+    # Use a per-distro project name so each compose service gets its own
+    # network.  Without this, all services share et-tester_default and
+    # tearing down one distro while another is running fails with
+    # "network has active endpoints".
+    dc       = ['docker-compose', '-p', os_name, '-f', yaml]
 
     _set_run(active=True, distro=os_name, phase='starting build',
              detail='', lines=[], success=None)
 
     with open(log_path, 'wb') as lf:
-        rc = _step(['docker-compose', '-f', yaml, 'build'], lf)
+        rc = _step(dc + ['build'], lf)
     if rc != 0:
         _set_run(active=False, phase='failed', detail='docker-compose build failed')
         return False
     _telegram(f'built {os_name}')
 
     _set_run(phase='stopping old container', detail='')
-    _step(['docker-compose', '-f', yaml, 'down'])
+    _step(dc + ['down'])
 
     _set_run(phase='starting container', detail='')
-    if _step(['docker-compose', '-f', yaml, 'up', '-d']) != 0:
+    if _step(dc + ['up', '-d']) != 0:
         _set_run(active=False, phase='failed', detail='docker-compose up failed')
         return False
 
@@ -266,7 +271,7 @@ def run_distro_live(os_name):
             _parse_valgrind_summary(os_name, dst)
 
     _set_run(phase='stopping container', detail='')
-    _step(['docker-compose', '-f', yaml, 'down'])
+    _step(dc + ['down'])
 
     label = 'done' if success else 'done (errors copying logs)'
     _set_run(active=False, phase=label, success=success)
