@@ -146,9 +146,12 @@ _STEP_PHASES = [
     (re.compile(r'useradd'),                 'creating user'),
 ]
 
-_SIM_RUN_RE     = re.compile(r'\+.*sim create-run (?:test|valgrind)(\d+)')
-_THORN_RE       = re.compile(r'(?:Building thorn|Compiling)\s+(\S+)')
+_SIM_RUN_RE      = re.compile(r'\+.*sim create-run (?:test|valgrind)(\d+)')
+_THORN_RE        = re.compile(r'(?:Building thorn|Compiling)\s+(\S+)')
 _VALGRIND_ERR_RE = re.compile(r'^==\d+== ERROR SUMMARY: (\d+) errors', re.MULTILINE)
+# Simfactory testsuite output lines (visible now that runtests.sh uses tee)
+_TEST_RUN_RE     = re.compile(r'Running\s+TEST\s*:?\s*(\S+)', re.IGNORECASE)
+_TEST_DONE_RE    = re.compile(r'\b(PASSED|FAILED|ERROR)\b')
 
 
 def _parse_line(line):
@@ -169,6 +172,18 @@ def _parse_line(line):
     if m:
         n = int(m.group(1))
         _set_run(detail=f'{n} error(s) so far' if n else 'clean so far')
+        return
+
+    m = _TEST_RUN_RE.search(line)
+    if m:
+        _set_run(detail=m.group(1))
+        return
+
+    m = _TEST_DONE_RE.search(line)
+    if m:
+        with _run_lock:
+            prev = _run.get('detail', '')
+        _set_run(detail=f'{prev}  [{m.group(1)}]')
         return
 
     m = _THORN_RE.search(line)

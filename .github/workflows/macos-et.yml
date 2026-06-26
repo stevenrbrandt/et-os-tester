@@ -97,8 +97,8 @@ jobs:
             echo "=== Running testsuite with procs=$nprocs threads=$threads ==="
             ./simfactory/bin/sim create-run test${nprocs} \
               --walltime 1:00:00 --testsuite \
-              --procs $nprocs --num-threads $threads --ppn-used=$nprocs \
-              > "$HOME/${SYSTEM}__${procs}_${threads}.log" 2>&1
+              --procs $nprocs --num-threads $threads --ppn-used=$nprocs 2>&1 \
+              | tee "$HOME/${SYSTEM}__${procs}_${threads}.log"
             echo "Exit code: $?"
           done
 

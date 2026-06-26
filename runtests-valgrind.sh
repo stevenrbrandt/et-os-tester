@@ -14,8 +14,8 @@ export CCTK_TESTSUITE_RUN_COMMAND="valgrind --error-exitcode=1 \
     --log-file=${VALGRIND_DIR}/%p.out"
 
 ./simfactory/bin/sim create-run valgrind${nprocs} --walltime 8:00:00 --testsuite \
-    --procs $nprocs --num-threads $threads --ppn-used=$nprocs \
-    > "$HOME/${SYSTEM}__1_${threads}.log" 2>&1 || true
+    --procs $nprocs --num-threads $threads --ppn-used=$nprocs 2>&1 \
+    | tee "$HOME/${SYSTEM}__1_${threads}.log" || true
 
 # Collect and summarise memory errors; output goes to summary file
 # (and is also printed so it appears in the docker build log).
