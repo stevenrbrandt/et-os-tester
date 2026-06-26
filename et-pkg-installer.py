@@ -11,10 +11,7 @@ def get_pkg_cmd():
             if os.path.exists(f):
                 return cmd
 
-pkg_cmd = get_pkg_cmd()
-
-if pkg_cmd == None:
-    raise Exception("Could not idenfity operating system")
+pkg_cmd = get_pkg_cmd()  # None when imported on an unsupported platform
 
 # the next couple of dicts describe the required packages to compile the ET.
 # Each entry uses a human-readable key for the softwre and then either a single
@@ -349,13 +346,11 @@ elif pkg_cmd == "pacman":
     pkgs = archk
 elif pkg_cmd == "brew":
     pkgs = brewk
-else:
-    raise Exception("No package manager")
-
-if pkgs == None:
-    raise Exception("Could not determine what packages to install")
 
 def install():
+    if pkgs is None:
+        raise Exception("Could not determine what packages to install — no known package manager found")
+
     answer={"installed":0,"missing":[]}
 
     fd = open("install-for-cactus.sh","w")

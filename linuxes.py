@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import curses
 import hashlib
+import importlib.util
 import json
 import os
 import re
@@ -306,6 +307,114 @@ def update_cactus_th():
     return False, old_md5
 
 
+# ── Install guide generation ─────────────────────────────────────────────────
+
+def _load_installer():
+    """Import et-pkg-installer.py as a module (filename has hyphens)."""
+    path = os.path.join(SCRIPT_DIR, 'et-pkg-installer.py')
+    spec = importlib.util.spec_from_file_location('et_pkg_installer', path)
+    mod  = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def _fmt_pkg(val):
+    """Return (install_list, markdown_cell) for one pkgdict value."""
+    if val is None:
+        return [], '*(pre-installed or not required)*'
+    if isinstance(val, str):
+        return [val], f'`{val}`'
+    # list of alternatives: each entry is either a str or a list-of-strs
+    parts = []
+    install = None
+    for opt in val:
+        if isinstance(opt, list):
+            strs = ' '.join(f'`{p}`' for p in opt)
+            if install is None:
+                install = opt
+        else:
+            strs = f'`{opt}`'
+            if install is None:
+                install = [opt]
+        parts.append(strs)
+    cell = ' *or* '.join(parts)
+    return install or [], cell
+
+
+def generate_install_guide():
+    """Write cactus-install-guide.md and return its path."""
+    mod = _load_installer()
+
+    SECTIONS = [
+        ('Debian / Ubuntu / Linux Mint', 'apt-get',  mod.debk,  [
+            'sudo apt-get update',
+        ]),
+        ('Fedora',                        'dnf',      mod.redk,  []),
+        ('Rocky Linux / AlmaLinux',       'dnf',      mod.redk,  [
+            '# Enable EPEL and CRB repositories first:',
+            'sudo dnf install -y epel-release',
+            'sudo dnf config-manager --set-enabled crb',
+        ]),
+        ('openSUSE',                      'zypper',   mod.susek, []),
+        ('Arch Linux',                    'pacman',   mod.archk, []),
+        ('macOS (Homebrew)',              'brew',     mod.brewk, [
+            '# Install Homebrew from https://brew.sh if not already present',
+        ]),
+    ]
+
+    INSTALL_PREFIX = {
+        'apt-get': 'sudo apt-get install -y',
+        'dnf':     'sudo dnf install -y',
+        'zypper':  'sudo zypper install -y',
+        'pacman':  'sudo pacman -S --noconfirm',
+        'brew':    'brew install',
+    }
+
+    out = os.path.join(SCRIPT_DIR, 'cactus-install-guide.md')
+    with open(out, 'w') as f:
+        f.write('# Cactus / Einstein Toolkit — Package Installation Guide\n\n')
+        f.write('Packages required to build and run the Einstein Toolkit,\n')
+        f.write('listed per platform.  Generated from `et-pkg-installer.py`.\n\n')
+
+        for title, cmd, pkgdict, prereqs in SECTIONS:
+            f.write(f'## {title}\n\n')
+
+            if prereqs:
+                f.write('```bash\n')
+                for line in prereqs:
+                    f.write(line + '\n')
+                f.write('```\n\n')
+
+            # Collect packages for the install command (first alternative)
+            to_install = []
+            seen = set()
+            for key in pkgdict:
+                pkgs, _ = _fmt_pkg(pkgdict[key])
+                for p in pkgs:
+                    if p not in seen:
+                        seen.add(p)
+                        to_install.append(p)
+
+            if to_install:
+                prefix = INSTALL_PREFIX[cmd]
+                f.write('```bash\n')
+                f.write(f'{prefix} \\\n')
+                for i, pkg in enumerate(to_install):
+                    cont = ' \\' if i < len(to_install) - 1 else ''
+                    f.write(f'    {pkg}{cont}\n')
+                f.write('```\n\n')
+
+            # Per-dependency table
+            f.write('| Dependency | Package |\n')
+            f.write('|------------|---------|\n')
+            for key in pkgdict:
+                _, cell = _fmt_pkg(pkgdict[key])
+                f.write(f'| {key} | {cell} |\n')
+            f.write('\n')
+
+    return out
+
+
 # ── Curses drawing ───────────────────────────────────────────────────────────
 
 def distro_status(os_name, current_md5):
@@ -407,7 +516,7 @@ def draw_menu(stdscr, selected, current_md5):
     if run['active']:
         keys = ' (test running — K:kill  Q:quit) '
     else:
-        keys = ' Enter:run  U:update cactus.th  R:refresh  A:run all  Q:quit '
+        keys = ' Enter:run  U:update cactus.th  R:refresh  A:run all  H:install guide  Q:quit '
     _addstr_clipped(stdscr, h - 1, max(0, (w - len(keys)) // 2), keys, curses.A_DIM)
 
     stdscr.refresh()
@@ -475,6 +584,19 @@ def main_loop(stdscr):
                 input()
                 probe_all(md5_file(CACTUS_TH))
                 stdscr.timeout(500)
+                stdscr.refresh()
+
+        elif key in (ord('h'), ord('H')):
+            if not run['active']:
+                curses.endwin()
+                print('\nGenerating install guide...')
+                try:
+                    path = generate_install_guide()
+                    print(f'Written to: {path}')
+                except Exception as e:
+                    print(f'Error: {e}')
+                print('\nPress Enter to return to menu...', end='', flush=True)
+                input()
                 stdscr.refresh()
 
         elif key in (ord('r'), ord('R')):

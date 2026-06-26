@@ -19,6 +19,9 @@ Cactus/
 .linuxes_state.json
 .valgrind_results.json
 
+# Generated
+cactus-install-guide.md
+
 # Misc
 __pycache__/
 *.pyc
