@@ -1,14 +1,7 @@
 name: macOS Einstein Toolkit
 
 on:
-  push:
-    branches: [main, master]
-    paths:
-      - '.github/workflows/macos-et.yml'
-      - 'runtests.sh'
-  workflow_dispatch:       # allow manual trigger from the Actions tab
-  schedule:
-    - cron: '0 3 * * 1'   # every Monday at 03:00 UTC
+  workflow_dispatch:       # triggered manually from the Actions tab
 
 jobs:
   build-and-test:
