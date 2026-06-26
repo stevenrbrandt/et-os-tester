@@ -6,7 +6,7 @@ import sys
 
 def get_pkg_cmd():
     for p in os.environ["PATH"].split(os.pathsep):
-        for cmd in ["apt-get","dnf","yum","zypper","pacman"]:
+        for cmd in ["apt-get","dnf","yum","zypper","pacman","brew"]:
             f = p+os.sep+cmd
             if os.path.exists(f):
                 return cmd
@@ -144,6 +144,39 @@ susek = {
     "libudev":None,
     }
 
+brewk = {
+    "perl":       None,            # pre-installed on macOS
+    "awk":        None,            # BSD awk is pre-installed
+    "cmake":      "cmake",
+    "gfortran":   "gcc",           # Homebrew gcc includes gfortran
+    "gcc":        "gcc",
+    "g++":        "gcc",           # g++ is part of Homebrew's gcc
+    "papi":       None,            # not in Homebrew
+    "gsl":        "gsl",
+    "lapack":     None,            # Apple Accelerate framework provides BLAS/LAPACK
+    "hdf5":       "hdf5",
+    "mpi":        [["open-mpi"]],
+    "pkg-config": "pkg-config",
+    "subversion": "subversion",
+    "git":        None,            # pre-installed via Xcode CLT
+    "python":     None,            # python3 pre-installed
+    "patch":      None,            # pre-installed
+    "make":       None,            # pre-installed
+    "numa":       None,            # Linux-only
+    "hwloc":      "hwloc",
+    "ssl":        "openssl",
+    "fftw":       "fftw",
+    "curl":       None,            # pre-installed on macOS
+    "which":      None,            # pre-installed
+    "rsync":      None,            # pre-installed
+    "tar":        None,            # pre-installed
+    "hostname":   None,            # pre-installed
+    "xargs":      None,            # pre-installed
+    "jpeg":       "jpeg-turbo",
+    "libtool":    "libtool",
+    "libudev":    None,            # Linux-only
+    }
+
 archk = {
     "perl":       "perl",
     "awk":        "gawk",
@@ -220,6 +253,7 @@ def check(h1,h2):
 check(debk,redk)
 check(redk,susek)
 check(redk,archk)
+check(redk,brewk)
 check(redk,cmds)
 
 install_cache = {}
@@ -269,6 +303,12 @@ def installed1(kcmd,cmd):
                 install_cache[line.split()[0]] = 1
         if cmd in install_cache:
             return {"installed":1,"missing":[]}
+    if pkg_cmd == "brew":
+        if install_cache == {}:
+            for line in os.popen("brew list --formula"):
+                install_cache[line.strip()] = 1
+        if cmd in install_cache:
+            return {"installed":1,"missing":[]}
     return {"installed":0,"missing":[cmd]}
 
 def installed(kcmd,cmd):
@@ -294,6 +334,8 @@ def installed(kcmd,cmd):
 def install_cmd():
     if pkg_cmd == "pacman":
         return "pacman -S --noconfirm"
+    if pkg_cmd == "brew":
+        return "brew install"
     return pkg_cmd + " install -y"
 
 pkgs = None
@@ -305,6 +347,8 @@ elif pkg_cmd == "zypper":
     pkgs = susek
 elif pkg_cmd == "pacman":
     pkgs = archk
+elif pkg_cmd == "brew":
+    pkgs = brewk
 else:
     raise Exception("No package manager")
 

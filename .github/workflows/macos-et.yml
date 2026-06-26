@@ -1,0 +1,115 @@
+name: macOS Einstein Toolkit
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - '.github/workflows/macos-et.yml'
+      - 'runtests.sh'
+  workflow_dispatch:       # allow manual trigger from the Actions tab
+  schedule:
+    - cron: '0 3 * * 1'   # every Monday at 03:00 UTC
+
+jobs:
+  build-and-test:
+    name: Build and test on macOS (Apple Silicon)
+    runs-on: macos-14          # M1 runner — free tier; swap macos-13 for Intel
+    timeout-minutes: 300       # 5-hour safety cap (build + tests can be slow)
+
+    env:
+      SYSTEM: macos
+
+    steps:
+      # ── 1. Repo ────────────────────────────────────────────────────────────
+      - uses: actions/checkout@v4
+
+      # ── 2. Homebrew packages ───────────────────────────────────────────────
+      - name: Install Homebrew packages
+        run: |
+          brew update --quiet
+          # gcc supplies gfortran; open-mpi supplies mpicc/mpif90/mpirun
+          # hdf5 is serial here — parallel HDF5 can be added later via hdf5-mpi
+          brew install gcc open-mpi hdf5 gsl fftw \
+                       subversion pkg-config hwloc libtool cmake openssl
+
+      # ── 3. Compiler / path environment ────────────────────────────────────
+      - name: Export compiler variables
+        run: |
+          # Homebrew GCC is versioned (gcc-14, g++-14, gfortran-14, …)
+          GCC_VER=$(ls /opt/homebrew/bin/gcc-[0-9]* 2>/dev/null | sort -V | tail -1)
+          GCC_VER=${GCC_VER##*/gcc-}
+          echo "GCC_VER=$GCC_VER"
+
+          BREW_PREFIX=$(brew --prefix)
+          echo "CC=gcc-${GCC_VER}"               >> "$GITHUB_ENV"
+          echo "CXX=g++-${GCC_VER}"              >> "$GITHUB_ENV"
+          echo "FC=gfortran-${GCC_VER}"          >> "$GITHUB_ENV"
+          echo "MPICC=mpicc"                      >> "$GITHUB_ENV"
+          echo "MPICXX=mpicxx"                    >> "$GITHUB_ENV"
+          echo "MPIFC=mpifort"                    >> "$GITHUB_ENV"
+          echo "${BREW_PREFIX}/bin"               >> "$GITHUB_PATH"
+          echo "PKG_CONFIG_PATH=${BREW_PREFIX}/lib/pkgconfig:${BREW_PREFIX}/share/pkgconfig" \
+                                                  >> "$GITHUB_ENV"
+          echo "LDFLAGS=-L${BREW_PREFIX}/lib"    >> "$GITHUB_ENV"
+          echo "CPPFLAGS=-I${BREW_PREFIX}/include" >> "$GITHUB_ENV"
+
+      # ── 4. Thornlist ───────────────────────────────────────────────────────
+      - name: Download cactus.th
+        run: |
+          curl -kLO https://bitbucket.org/einsteintoolkit/manifest/raw/master/einsteintoolkit.th
+          cp einsteintoolkit.th cactus.th
+
+      # ── 5. GetComponents ───────────────────────────────────────────────────
+      - name: Fetch GetComponents
+        run: |
+          curl -kLO https://raw.githubusercontent.com/gridaphobe/CRL/master/GetComponents
+          chmod a+x GetComponents
+
+      # ── 6. Source cache — keyed on thornlist content ───────────────────────
+      - name: Cache ET source tree
+        id: cache-cactus
+        uses: actions/cache@v4
+        with:
+          path: Cactus
+          key: cactus-src-macos14-${{ hashFiles('cactus.th') }}
+          restore-keys: cactus-src-macos14-
+
+      - name: Fetch ET source tree
+        if: steps.cache-cactus.outputs.cache-hit != 'true'
+        run: ./GetComponents --parallel cactus.th
+
+      # ── 7. Simfactory setup ────────────────────────────────────────────────
+      - name: Configure simfactory
+        run: |
+          echo github-macos > ~/.hostname
+          cd Cactus
+          ./simfactory/bin/sim setup-silent
+
+      # ── 8. Build ───────────────────────────────────────────────────────────
+      - name: Build ET
+        run: |
+          cd Cactus
+          ./simfactory/bin/sim build -j3 --thornlist ../cactus.th 2>&1 | tee build.log
+
+      # ── 9. Tests ───────────────────────────────────────────────────────────
+      - name: Run test suite
+        run: |
+          cd Cactus
+          for procs in 1 2; do
+            threads=4
+            nprocs=$((procs*threads))
+            ./simfactory/bin/sim create-run test${nprocs} \
+              --walltime 1:00:00 --testsuite \
+              --procs $nprocs --num-threads $threads --ppn-used=$nprocs \
+              > "$HOME/${SYSTEM}__${procs}_${threads}.log" 2>&1 || true
+          done
+
+      # ── 10. Artifacts ──────────────────────────────────────────────────────
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-logs-${{ github.run_number }}
+          path: |
+            ~/macos__*.log
+            Cactus/build.log
