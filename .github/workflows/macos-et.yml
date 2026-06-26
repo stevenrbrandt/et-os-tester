@@ -85,7 +85,12 @@ jobs:
       # ── 7. Simfactory setup ────────────────────────────────────────────────
       - name: Configure simfactory
         run: |
-          echo github-macos > ~/.hostname
+          echo MacOS > ~/.hostname
+          # Install custom MacOS machine description and option list
+          cp "$GITHUB_WORKSPACE/simfactory/MacOS.ini" \
+             Cactus/repos/simfactory2/mdb/machines/MacOS.ini
+          cp "$GITHUB_WORKSPACE/simfactory/MacOS.cfg" \
+             Cactus/repos/simfactory2/mdb/optionlists/MacOS.cfg
           cd Cactus
           ./simfactory/bin/sim setup-silent
 
@@ -98,7 +103,7 @@ jobs:
           echo "=== compiler env vars ==="
           echo "CC=$CC  CXX=$CXX  FC=$FC"
           echo "=== simfactory machine config ==="
-          find Cactus/repos/simfactory2/mdb/machines -name 'github-macos*' 2>/dev/null \
+          find Cactus/repos/simfactory2/mdb/machines -name 'MacOS*' 2>/dev/null \
             | xargs cat 2>/dev/null || echo "(not found)"
           echo "=== OptionList (if already generated) ==="
           find Cactus -name 'OptionList' 2>/dev/null | xargs cat 2>/dev/null \
