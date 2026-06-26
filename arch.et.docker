@@ -15,6 +15,13 @@ RUN chmod a+x GetComponents
 COPY cactus.th ./
 RUN ./GetComponents --parallel cactus.th
 RUN echo testme > .hostname
+# On Arch, /usr/sbin is a symlink to /usr/bin, so `hash cmake` may resolve
+# to /usr/sbin/cmake.  The ExternalLibraries-CMake detect.sh strips /bin/cmake
+# from that path to get CMAKE_DIR, but /usr/sbin/cmake doesn't end in /bin/cmake
+# so stripping fails and CMAKE_DIR is left as /usr/sbin/cmake (a file, not a
+# directory).  Setting CMAKE_DIR=/usr bypasses detection and points directly to
+# /usr/bin/cmake where Arch installs it.
+ENV CMAKE_DIR=/usr
 WORKDIR /home/etuser/Cactus
 RUN ./simfactory/bin/sim setup-silent
 RUN ./simfactory/bin/sim build -j8 --thornlist ../cactus.th
