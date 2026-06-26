@@ -363,21 +363,31 @@ def generate_install_guide():
     """Write cactus-install-guide.md and return its path."""
     mod = _load_installer()
 
+    # Each entry: (title, pkg_cmd, pkgdict, prereq_lines, notes_markdown)
     SECTIONS = [
         ('Debian / Ubuntu / Linux Mint', 'apt-get',  mod.debk,  [
             'sudo apt-get update',
-        ]),
-        ('Fedora',                        'dnf',      mod.redk,  []),
+        ], None),
+        ('Fedora',                        'dnf',      mod.redk,  [
+        ], None),
         ('Rocky Linux / AlmaLinux',       'dnf',      mod.redk,  [
             '# Enable EPEL and CRB repositories first:',
             'sudo dnf install -y epel-release',
             'sudo dnf config-manager --set-enabled crb',
-        ]),
-        ('openSUSE',                      'zypper',   mod.susek, []),
-        ('Arch Linux',                    'pacman',   mod.archk, []),
+        ], None),
+        ('openSUSE',                      'zypper',   mod.susek, [
+        ], None),
+        ('Arch Linux',                    'pacman',   mod.archk, [
+        ], None),
         ('macOS (Homebrew)',              'brew',     mod.brewk, [
             '# Install Homebrew from https://brew.sh if not already present',
-        ]),
+        ], (
+            '> **Note — GCC version:** Install `gcc@14` rather than the default `gcc`.\n'
+            '> GCC 16 (Homebrew\'s current default as of mid-2025) has an internal\n'
+            '> compiler error (ICE) when building `ET_BHaHAHA` with `-O2` and OpenMP\n'
+            '> enabled (`#pragma GCC reset_options` inside an OpenMP-outlined function\n'
+            '> triggers a segfault in the `evrp` pass of `cc1`).  GCC 14 builds cleanly.\n'
+        )),
     ]
 
     INSTALL_PREFIX = {
@@ -394,8 +404,11 @@ def generate_install_guide():
         f.write('Packages required to build and run the Einstein Toolkit,\n')
         f.write('listed per platform.  Generated from `et-pkg-installer.py`.\n\n')
 
-        for title, cmd, pkgdict, prereqs in SECTIONS:
+        for title, cmd, pkgdict, prereqs, notes in SECTIONS:
             f.write(f'## {title}\n\n')
+
+            if notes:
+                f.write(notes + '\n')
 
             if prereqs:
                 f.write('```bash\n')

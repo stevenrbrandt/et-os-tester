@@ -146,8 +146,8 @@ brewk = {
     "awk":        None,            # BSD awk is pre-installed
     "cmake":      "cmake",
     "gfortran":   "gcc",           # Homebrew gcc includes gfortran
-    "gcc":        "gcc",
-    "g++":        "gcc",           # g++ is part of Homebrew's gcc
+    "gcc":        "gcc@14",         # gcc@14 recommended; GCC 16 has an ICE with ET_BHaHAHA
+    "g++":        "gcc@14",        # g++ is part of Homebrew's gcc
     "papi":       None,            # not in Homebrew
     "gsl":        "gsl",
     "lapack":     None,            # Apple Accelerate framework provides BLAS/LAPACK
