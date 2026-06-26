@@ -20,17 +20,18 @@ jobs:
       - name: Install Homebrew packages
         run: |
           brew update --quiet
-          # gcc supplies gfortran; open-mpi supplies mpicc/mpif90/mpirun
+          # gcc@14 avoids a GCC 16 ICE in ET_BHaHAHA with -O2 + OpenMP +
+          # #pragma GCC reset_options (https://gcc.gnu.org/bugzilla).
+          # open-mpi supplies mpicc/mpif90/mpirun
           # hdf5 is serial here — parallel HDF5 can be added later via hdf5-mpi
-          brew install gcc open-mpi hdf5 gsl fftw \
+          brew install gcc@14 open-mpi hdf5 gsl fftw \
                        subversion pkg-config hwloc libtool cmake openssl
 
       # ── 3. Compiler / path environment ────────────────────────────────────
       - name: Export compiler variables
         run: |
-          # Homebrew GCC is versioned (gcc-14, g++-14, gfortran-14, …)
-          GCC_VER=$(ls /opt/homebrew/bin/gcc-[0-9]* 2>/dev/null | sort -V | tail -1)
-          GCC_VER=${GCC_VER##*/gcc-}
+          # Pin to gcc-14 to avoid the GCC 16 ICE
+          GCC_VER=14
           echo "GCC_VER=$GCC_VER"
 
           BREW_PREFIX=$(brew --prefix)
