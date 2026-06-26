@@ -71,8 +71,8 @@ jobs:
         uses: actions/cache@v5
         with:
           path: Cactus
-          key: cactus-src-macos14-${{ hashFiles('cactus.th') }}
-          restore-keys: cactus-src-macos14-
+          key: cactus-src-macos14-gcc14-${{ hashFiles('cactus.th') }}
+          restore-keys: cactus-src-macos14-gcc14-
 
       - name: Fetch ET source tree
         if: steps.cache-cactus.outputs.cache-hit != 'true'
@@ -87,9 +87,10 @@ jobs:
 
       # ── 8. Build ───────────────────────────────────────────────────────────
       - name: Show simfactory compiler configuration
+        if: always()
         run: |
           echo "=== gcc in PATH ==="
-          which gcc && gcc --version
+          which gcc; gcc --version || true
           echo "=== compiler env vars ==="
           echo "CC=$CC  CXX=$CXX  FC=$FC"
           echo "=== simfactory machine config ==="
