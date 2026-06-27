@@ -21,8 +21,9 @@ jobs:
       - name: Install Homebrew packages
         run: |
           brew update --quiet
-          # gcc@14 avoids a GCC 16 ICE in ET_BHaHAHA with -O2 + OpenMP +
-          # #pragma GCC reset_options (https://gcc.gnu.org/bugzilla).
+          # gcc@14 is pinned for stability; the GCC ICE in ET_BHaHAHA
+          # (-O2 + OpenMP + #pragma GCC reset_options, evrp pass) affects
+          # GCC 14 on Apple Silicon too, so MacOS.cfg adds -fno-tree-evrp.
           # open-mpi supplies mpicc/mpif90/mpirun
           # hdf5 is serial here — parallel HDF5 can be added later via hdf5-mpi
           brew install gcc@14 open-mpi hdf5 gsl fftw \
