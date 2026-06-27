@@ -14,7 +14,7 @@ RUN curl -kLO https://raw.githubusercontent.com/gridaphobe/CRL/master/GetCompone
 RUN chmod a+x GetComponents
 COPY cactus.th ./
 RUN ./GetComponents --parallel cactus.th
-RUN echo testme > .hostname
+RUN echo arch > .hostname
 # On Arch, /usr/sbin is a symlink to /usr/bin, so `hash cmake` may resolve
 # to /usr/sbin/cmake.  The ExternalLibraries-CMake detect.sh strips /bin/cmake
 # from that path to get CMAKE_DIR, but /usr/sbin/cmake doesn't end in /bin/cmake
@@ -23,6 +23,10 @@ RUN echo testme > .hostname
 # /usr/bin/cmake where Arch installs it.
 ENV CMAKE_DIR=/usr
 WORKDIR /home/etuser/Cactus
+# Install Arch-specific simfactory configs (arch.cfg adds
+# -Wno-error=incompatible-pointer-types for GCC 14 Silo compatibility).
+COPY simfactory/arch.ini repos/simfactory2/mdb/machines/arch.ini
+COPY simfactory/arch.cfg repos/simfactory2/mdb/optionlists/arch.cfg
 RUN ./simfactory/bin/sim setup-silent
 RUN ./simfactory/bin/sim build -j8 --thornlist ../cactus.th
 COPY runtests.sh .
