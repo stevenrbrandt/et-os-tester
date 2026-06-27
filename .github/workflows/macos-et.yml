@@ -120,7 +120,7 @@ jobs:
           set -o pipefail
           cd Cactus
           for procs in 1 2; do
-            threads=4
+            threads=1
             nprocs=$((procs*threads))
             echo "=== Running testsuite with procs=$nprocs threads=$threads ==="
             ./simfactory/bin/sim create-run test${nprocs} \
