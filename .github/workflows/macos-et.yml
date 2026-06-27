@@ -21,25 +21,20 @@ jobs:
       - name: Install Homebrew packages
         run: |
           brew update --quiet
-          # gcc@14 is pinned for stability; the GCC ICE in ET_BHaHAHA
-          # (-O2 + OpenMP + #pragma GCC reset_options, vrp pass) affects
-          # GCC 14 on Apple Silicon too, so MacOS.cfg adds -fno-tree-vrp.
           # open-mpi supplies mpicc/mpif90/mpirun
           # hdf5 is serial here — parallel HDF5 can be added later via hdf5-mpi
-          brew install gcc@14 open-mpi hdf5 gsl fftw \
+          brew install gcc@16 open-mpi hdf5 gsl fftw \
                        subversion pkg-config hwloc libtool cmake openssl
-          # Make unversioned gcc/g++/gfortran names resolve to gcc@14 so
-          # simfactory's compiler auto-detection doesn't pick up a newer GCC.
-          brew link --force --overwrite gcc@14
+          brew link --force --overwrite gcc@16
 
       # ── 3. Compiler / path environment ────────────────────────────────────
       - name: Export compiler variables
         run: |
-          GCC_VER=14
+          GCC_VER=16
           BREW_PREFIX=$(brew --prefix)
 
-          # gcc@14 is keg-only: brew link only creates versioned names
-          # (gcc-14, g++-14, gfortran-14), not the unversioned 'gcc'.
+          # gcc@16 is keg-only: brew link only creates versioned names
+          # (gcc-16, g++-16, gfortran-16), not the unversioned 'gcc'.
           # simfactory's setup-silent scans PATH for 'gcc', which otherwise
           # finds Apple Clang at /usr/bin/gcc.  Create explicit symlinks.
           ln -sf "${BREW_PREFIX}/opt/gcc@${GCC_VER}/bin/gcc-${GCC_VER}"      "${BREW_PREFIX}/bin/gcc"
@@ -76,8 +71,8 @@ jobs:
         uses: actions/cache@v5
         with:
           path: Cactus
-          key: cactus-src-macos14-gcc14-${{ hashFiles('cactus.th') }}
-          restore-keys: cactus-src-macos14-gcc14-
+          key: cactus-src-macos14-gcc16-${{ hashFiles('cactus.th') }}
+          restore-keys: cactus-src-macos14-gcc16-
 
       - name: Fetch ET source tree
         if: steps.cache-cactus.outputs.cache-hit != 'true'
